@@ -32,8 +32,8 @@ colcon build --symlink-install
 ``` bash
 chmod +x ~/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/setup_explore.bash #或你的工作空间路径
 ```
-``` bash
 在bashrc中添加下面一行：
+``` bash
 source ~/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/setup_explore.bash  #或你的工作空间路径
 ```
 ``` bash
@@ -69,36 +69,50 @@ ros2 launch slam_toolbox online_async_launch.py use_sim_time:=True
 默认为：/opt/ros/humble/share/nav2_bringup/params/nav2_params.yaml
 不建议直接在系统文件下更改，可以直接复制一个副本，放在任意你喜欢的路径下s
 为了好找，建议放在工作路径~/Documents/vln_gazebo_simulator/nav2_params.yaml这里 -->
-```bash
+``` bash
 turtle3init
-
+```
+``` bash
 # default
-ros2 launch nav2_bringup navigation_launch.py slam:=True params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2_params.yaml # 或你自己的param路径
-
+ros2 launch nav2_bringup navigation_launch.py \
+  slam:=True \
+  params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2_params.yaml # 或你自己的param路径
+```
+``` bash
 # jiangn19
-ros2 launch nav2_bringup navigation_launch.py slam:=True params_file:=/home/nanyuanchaliang/Documents/vln_gazebo_simulator/nav2_params.yaml
-
+ros2 launch nav2_bringup navigation_launch.py \
+  slam:=True \
+  params_file:=/home/nanyuanchaliang/Documents/vln_gazebo_simulator/nav2_params.yaml
+```
+``` bash
 # chengsn
-ros2 launch nav2_bringup navigation_launch.py slam:=True params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2_params.yaml
+ros2 launch nav2_bringup navigation_launch.py \
+  slam:=True \
+  params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2_params.yaml
 ```
 ### 启动explore_lite自主探索
 ```bash
 turtle3init
-
+```
+``` bash
 # 使用默认params启动:位于explore文件夹
 ros2 launch explore_lite explore.launch.py use_sim_time:=True
-
+```
+``` bash
 # 使用自定义params文件启动
 ros2 launch explore_lite explore.launch.py \
   use_sim_time:=True \
-  params_file:=//home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/params_costmap.yaml
-
+  params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/params_costmap.yaml
+```
+``` bash
 # jiangn19
-ros2 launch nav2_bringup navigation_launch.py slam:=True params_file:=/home/nanyuanchaliang/Documents/vln_gazebo_simulator/params_costmap.yaml
-
+ros2 launch explore_lite explore.launch.py \
+  use_sim_time:=True \
+  params_file:=/home/nanyuanchaliang/Documents/vln_gazebo_simulator/params_costmap.yaml
+```
+``` bash
 # chengsn
 ros2 launch explore_lite explore.launch.py \
   use_sim_time:=True \
   params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/params_costmap.yaml
-
 ```
