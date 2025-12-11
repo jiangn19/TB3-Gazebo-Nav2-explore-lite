@@ -1,0 +1,8 @@
+[submodule "src/teb_planner/costmap_converter"]
+	path = src/teb_planner/costmap_converter
+	url = https://github.com/rst-tu-dortmund/costmap_converter.git
+	branch = humble
+[submodule "src/teb_planner/teb_local_planner"]
+	path = src/teb_planner/teb_local_planner
+	url = https://github.com/rst-tu-dortmund/teb_local_planner.git
+	branch = humble-devel

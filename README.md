@@ -1,11 +1,13 @@
 # TB3-Gazebo-Nav2-explore-lite
 TB3 + Gazebo + Nav2 + explore_lite 仿真与自主探索
 
-## 仿真环境前置要求
-### 按照教程安装vln_gazebo_simulator
-参考：https://github.com/Tipriest/vln_gazebo_simulator
+## 安装配置
 
-## 安装步骤
+### 仿真环境前置要求：按照教程安装vln_gazebo_simulator
+```bash
+参考：https://github.com/Tipriest/vln_gazebo_simulator
+参考放置目录: ~/Documents/vln_gazebo_simulator #或你的工作空间路径
+```
 ### 安装Nav2和TB3
 ``` bash
 sudo apt install ros-humble-navigation2
@@ -13,42 +15,77 @@ sudo apt install ros-humble-nav2-bringup
 sudo apt install ros-humble-slam-toolbox
 sudo apt install ros-humble-turtlebot3-gazebo
 ```
-### Clone ExploreLite
-打开/Documents/vln_gazebo_simulator/src
-
+### 下载explore源码
 ``` bash
-cd ~/Documents/vln_gazebo_simulator/src
-git clone https://github.com/robo-friends/m-explore-ros2.git
+cd ~/Documents/vln_gazebo_simulator/src #或你的工作空间路径
+git clone https://github.com/jiangn19/TB3-Gazebo-Nav2-explore-lite
+git submodule update --init --recursive
+rm -r src/m-explore-ros2/map_merge
 ```
-
 ### 编译
 ``` bash
 cd ..
+source /opt/ros/humble/setup.bash 
 colcon build --symlink-install
+# colcon build --symlink-install --packages-select explore_lite
 ```
-
-### 
-
-### 运行简单场景仿真
+### 配置路径依赖
 ``` bash
-source /opt/ros/humble/setup.bash
-source ~/Workspace/explore_ws/install/setup.bash
-export TURTLEBOT3_MODEL=waffle
-export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:/opt/ros/${ROS_DISTRO}/share/turtlebot3_gazebo/models
-# （可选）简单场景
-ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True
-# （可选）房屋场景
-ros2 launch tb3_simulation tb3_simulation_house_launch.py slam:=True
-
-
-# habitatsim场景
-
-# 导航
-ros2 launch nav2_bringup navigation_launch.py slam:=True params_file:=/home/chengsn/Workspace/explore_ws/src/tb3_simulation/config/nav2_params_house.yaml
-# 建图场景
-ros2 launch slam_toolbox online_sync_launch.py use_sim_time:=True
-# （可选）键盘控制节点
-
-# 探索节点
-ros2 launch explore_lite explore.launch.py
+cd src/TB3-Gazebo-Nav2-explore-lite
+chmod +x ./setup_explore.bash
+# 在bashrc中添加
+source ~/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/setup_explore.bash  #或你的工作空间路径
+source ~/.bashrc
+turtle3init
 ```
+### 测试
+``` bash
+# tb3功能性测试
+# ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True
+# ros2 launch tb3_simulation tb3_simulation_house_launch.py slam:=True
+```
+
+
+## 运行探索
+
+### 运行仿真场景
+``` bash
+turtle3init
+# 启动00829场景 tb3 + gazebo场景仿真
+ros2 launch turtlebot3_gazebo turtlebot3_00829.launch.py
+```
+### 启动slam_toolbox建图
+``` bash
+turtle3init
+# 启动slam-toolbox在线建图（使用仿真时间）
+ros2 launch slam_toolbox online_async_launch.py use_sim_time:=True
+```
+### 启动nav2导航
+<!-- 需要按照自己的路径更改一下params_file对应的 nav2_params.yaml 的路径
+初始路径在ros humble对应的安装路径下的nav2_bringup包里面
+默认为：/opt/ros/humble/share/nav2_bringup/params/nav2_params.yaml
+不建议直接在系统文件下更改，可以直接复制一个副本，放在任意你喜欢的路径下s
+为了好找，建议放在工作路径~/Documents/vln_gazebo_simulator/nav2_params.yaml这里 -->
+```bash
+turtle3init
+
+# default
+ros2 launch nav2_bringup navigation_launch.py slam:=True params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2_params.yaml # 或你自己的param路径
+
+# jiangn19
+ros2 launch nav2_bringup navigation_launch.py slam:=True params_file:=/home/nanyuanchaliang/Documents/vln_gazebo_simulator/nav2_params.yaml # 或你自己的param路径
+
+# chengsn
+ros2 launch nav2_bringup navigation_launch.py slam:=True params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2_params.yaml
+```
+### 启动explore_lite自主探索
+```bash
+turtle3init
+
+# 使用默认params启动
+ros2 launch explore_lite explore.launch.py use_sim_time:=True
+
+# 使用自定义params文件启动
+ros2 launch explore_lite explore.launch.py \
+  use_sim_time:=True \
+  params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/params_costmap.yaml
