@@ -75,16 +75,19 @@ turtle3init
 ``` bash
 # default
 ros2 launch nav2_bringup navigation_launch.py \
+  use_sim_time:=True \
   params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2_params.yaml # 或你自己的param路径
 ```
 ``` bash
 # jiangn19
 ros2 launch nav2_bringup navigation_launch.py \
+  use_sim_time:=True \
   params_file:=/home/nanyuanchaliang/Documents/vln_gazebo_simulator/nav2_params.yaml
 ```
 ``` bash
 # chengsn
 ros2 launch nav2_bringup navigation_launch.py \
+  use_sim_time:=True \
   params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2_params.yaml
 ```
 ### 启动explore_lite自主探索
