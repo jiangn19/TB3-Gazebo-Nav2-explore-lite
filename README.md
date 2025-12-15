@@ -75,19 +75,16 @@ turtle3init
 ``` bash
 # default
 ros2 launch nav2_bringup navigation_launch.py \
-  slam:=True \
   params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2_params.yaml # 或你自己的param路径
 ```
 ``` bash
 # jiangn19
 ros2 launch nav2_bringup navigation_launch.py \
-  slam:=True \
   params_file:=/home/nanyuanchaliang/Documents/vln_gazebo_simulator/nav2_params.yaml
 ```
 ``` bash
 # chengsn
 ros2 launch nav2_bringup navigation_launch.py \
-  slam:=True \
   params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2_params.yaml
 ```
 ### 启动explore_lite自主探索
@@ -115,4 +112,14 @@ ros2 launch explore_lite explore.launch.py \
 ros2 launch explore_lite explore.launch.py \
   use_sim_time:=True \
   params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/params_costmap.yaml
+```
+
+### 启动语义障碍投影节点
+#### 从静态地图加载keepout mask
+```bash
+ros2 launch nav2_costmap_filters_demo costmap_filter_info.launch.py use_composition:=False params_file:=src/TB3-Gazebo-Nav2-explore-lite/src/nav2_costmap_filters_demo/params/keepout_params.yaml mask:=src/TB3-Gazebo-Nav2-explore-lite/src/nav2_costmap_filters_demo/maps/keepout_mask.yaml
+```
+#### 从yaml文件加载keepout mask
+```bash
+ros2 launch nav2_costmap_filters_demo bbox_costmap_filter.launch.py use_sim_time:=True params_file:=src/TB3-Gazebo-Nav2-explore-lite/src/nav2_costmap_filters_demo/params/keepout_params.yaml bboxes:=config/keepout_bboxes.yaml
 ```

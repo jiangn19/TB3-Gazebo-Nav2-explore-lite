@@ -1,0 +1,37 @@
+# 配置禁止通行区域（长方形）
+bboxes:
+  - frame: odom
+    # 四角坐标（顺序不重要），基于 frame (例: odom)
+    corners:
+      - [1.0, 0.5]
+      - [1.0, -0.5]
+      - [2.0, -0.5]
+      - [2.0, 0.5]
+  - frame: odom
+    corners:
+      - [-0.5, 1.0]
+      - [-1.0, 1.0]
+      - [-1.0, 2.0]
+      - [-0.5, 2.0]
+  - frame: odom
+    corners:
+      - [-1.5, -2.0]
+      - [-1.0, -2.0]
+      - [-1.0, -1.0]
+      - [-1.5, -1.0]
+  - frame: odom
+    corners:
+      - [1.5, 2.0]
+      - [2.5, 2.0]
+      - [2.5, 3.0]
+      - [1.5, 3.0]
+
+
+
+# grid parameters
+resolution: 0.05 # 请和nav2的分辨率保持一致
+topic: /keepout_filter_mask
+publish_rate: 1.0
+target_frame: map
+# maximum allowed cells in generated grid (safety)
+max_cells: 400000
