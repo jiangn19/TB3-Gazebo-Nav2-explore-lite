@@ -19,7 +19,7 @@ sudo apt install ros-humble-turtlebot3-gazebo
 ``` bash
 cd ~/Documents/vln_gazebo_simulator/src #或你的工作空间路径
 git clone https://github.com/jiangn19/TB3-Gazebo-Nav2-explore-lite
-git submodule update --init --recursive
+# git submodule update --init --recursive
 ```
 ### 编译
 ``` bash
@@ -50,25 +50,36 @@ turtle3init
 Nav2与explorelite默认参数位于config文件夹中
 启动节点时，使用'params_file:='指定加载的参数位置
 
-## 运行探索
+
+## 运行
+
 ### 运行仿真场景
 ``` bash
 turtle3init
 # 启动00829场景 tb3 + gazebo场景仿真
 ros2 launch turtlebot3_gazebo turtlebot3_00829.launch.py
 ```
-### 启动slam_toolbox建图
+
+### 探索阶段
+### [探索阶段]启动slam_toolbox建图
 ``` bash
 turtle3init
-# 启动slam-toolbox在线建图（使用仿真时间）
-ros2 launch slam_toolbox online_async_launch.py use_sim_time:=True
 ```
-### 启动nav2导航
-<!-- 需要按照自己的路径更改一下params_file对应的 nav2_params.yaml 的路径
-初始路径在ros humble对应的安装路径下的nav2_bringup包里面
-默认为：/opt/ros/humble/share/nav2_bringup/params/nav2_params.yaml
-不建议直接在系统文件下更改，可以直接复制一个副本，放在任意你喜欢的路径下s
-为了好找，建议放在工作路径~/Documents/vln_gazebo_simulator/nav2_params.yaml这里 -->
+```bash
+# 启动slam-toolbox在线建图（使用仿真时间）
+ros2 launch slam_toolbox online_async_launch.py \
+  use_sim_time:=True \
+  slam_params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/mapping/mapper_params_online_async.yaml # 或你自己的param路径
+```
+``` bash
+# chengsn
+ros2 launch slam_toolbox online_async_launch.py \
+  use_sim_time:=True \
+  params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/mapping/mapper_params_online_async.yaml
+```
+
+### [探索阶段]启动nav2导航: 不包含amcl和nav2_map_server
+### map到odom转换由slam提供
 ``` bash
 turtle3init
 ```
@@ -76,7 +87,7 @@ turtle3init
 # default
 ros2 launch nav2_bringup navigation_launch.py \
   use_sim_time:=True \
-  params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2_params.yaml # 或你自己的param路径
+  params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params.yaml # 或你自己的param路径
 ```
 ``` bash
 # jiangn19
@@ -88,9 +99,10 @@ ros2 launch nav2_bringup navigation_launch.py \
 # chengsn
 ros2 launch nav2_bringup navigation_launch.py \
   use_sim_time:=True \
-  params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2_params.yaml
+  params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params.yaml
 ```
-### 启动explore_lite自主探索
+
+### [探索阶段]启动explore_lite自主探索
 ```bash
 turtle3init
 ```
@@ -102,7 +114,7 @@ ros2 launch explore_lite explore.launch.py use_sim_time:=True
 # 使用自定义params文件启动
 ros2 launch explore_lite explore.launch.py \
   use_sim_time:=True \
-  params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/params_costmap.yaml
+  params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/explore/params_costmap.yaml
 ```
 ``` bash
 # jiangn19
@@ -114,15 +126,60 @@ ros2 launch explore_lite explore.launch.py \
 # chengsn
 ros2 launch explore_lite explore.launch.py \
   use_sim_time:=True \
-  params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/params_costmap.yaml
+  params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/explore/params_costmap.yaml
 ```
 
-### 启动语义障碍投影节点
-#### 从静态地图加载keepout mask
+### [探索阶段]保存建好的2D地图
 ```bash
-ros2 launch nav2_costmap_filters_demo costmap_filter_info.launch.py use_composition:=False params_file:=src/TB3-Gazebo-Nav2-explore-lite/src/nav2_costmap_filters_demo/params/keepout_params.yaml mask:=src/TB3-Gazebo-Nav2-explore-lite/src/nav2_costmap_filters_demo/maps/keepout_mask.yaml
+turtle3init
+```
+```bash
+ros2 run nav2_map_server map_saver_cli -f ~/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/map/map_00829
+```
+
+### 导航阶段
+[TODO]状态机实现模式切换
+### [导航阶段]启动nav2定位，包括amcl和nav2_map_server
+```bash
+ros2 launch nav2_bringup localization_launch.py \
+  use_sim_time:=True \
+  map:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/maps/site_00829.yaml \
+  params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params.yaml
+```
+[TODO]需要手动发送2D Pose Estimate， 利用状态机自动发送
+
+### [导航阶段]启动nav2导航
+``` bash
+turtle3init
+```
+``` bash
+# default
+ros2 launch nav2_bringup navigation_launch.py \
+  use_sim_time:=True \
+  params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params.yaml # 或你自己的param路径
+```
+``` bash
+# jiangn19
+ros2 launch nav2_bringup navigation_launch.py \
+  use_sim_time:=True \
+  params_file:=/home/nanyuanchaliang/Documents/vln_gazebo_simulator/nav2_params.yaml
+```
+``` bash
+# chengsn
+ros2 launch nav2_bringup navigation_launch.py \
+  use_sim_time:=True \
+  params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params.yaml
+```
+
+### [导航阶段]启动语义障碍投影节点
+``` bash
+turtle3init
 ```
 #### 从yaml文件加载keepout mask
 ```bash
-ros2 launch nav2_costmap_filters_demo bbox_costmap_filter.launch.py use_sim_time:=True params_file:=src/TB3-Gazebo-Nav2-explore-lite/src/nav2_costmap_filters_demo/params/keepout_params.yaml bboxes:=config/keepout_bboxes.yaml
+ros2 launch nav2_costmap_filters_demo bbox_costmap_filter.launch.py use_sim_time:=True params_file:=src/TB3-Gazebo-Nav2-explore-lite/src/nav2_costmap_filters_demo/params/keepout_params.yaml bboxes:=config/nav2/keepout_bboxes.yaml
+```
+```bash
+# chengsn
+ros2 launch nav2_costmap_filters_demo bbox_costmap_filter.launch.py use_sim_time:=True params_file:=src/TB3-Gazebo-Nav2-explore-lite/src/nav2_costmap_filters_demo/params/keepout_params.yaml bboxes:=src/TB3-Gazebo-Nav2-explore-lite/config/nav2/keepout_bboxes.yaml
 ```
