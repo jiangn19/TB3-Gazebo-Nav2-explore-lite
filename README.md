@@ -168,6 +168,15 @@ ros2 launch nav2_bringup bringup_launch.py \
 ros2 launch nav2_bringup bringup_launch_without_smooth.py \
   use_sim_time:=True \
   autostart:=False \
+  map:=/home/sudongxu/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/map/map_00829.yaml \
+  params_file:=/home/sudongxu/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params_pnc_dwb2.yaml  # 不包含平滑节点，以符合机器人底盘的要求
+```
+
+``` bash
+# sudongxu
+ros2 launch nav2_bringup bringup_launch_without_smooth.py \
+  use_sim_time:=True \
+  autostart:=False \
   map:=/home/sudongxu/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/map/map1216.yaml \
   params_file:=/home/sudongxu/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params_pnc_dwb2.yaml  # 不包含平滑节点，以符合机器人底盘的要求
 ```
