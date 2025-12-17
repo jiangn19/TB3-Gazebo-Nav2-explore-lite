@@ -101,6 +101,12 @@ ros2 launch nav2_bringup navigation_launch.py \
   use_sim_time:=True \
   params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params.yaml
 ```
+``` bash
+# sudongxu
+ros2 launch nav2_bringup navigation_launch_without_smooth.py \
+  use_sim_time:=True \
+  params_file:=/home/sudongxu/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params_pnc_dwb2.yaml  # 不包含平滑节点，以符合机器人底盘的要求
+```
 
 ### [探索阶段]启动explore_lite自主探索
 ```bash
@@ -137,38 +143,67 @@ turtle3init
 ros2 run nav2_map_server map_saver_cli -f ~/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/map/map_00829
 ```
 
-### 导航阶段
-[TODO]状态机实现模式切换
-### [导航阶段]启动nav2定位，包括amcl和nav2_map_server
-```bash
-ros2 launch nav2_bringup localization_launch.py \
-  use_sim_time:=True \
-  map:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/maps/site_00829.yaml \
-  params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params.yaml
-```
-[TODO]需要手动发送2D Pose Estimate， 利用状态机自动发送
-
 ### [导航阶段]启动nav2导航
+``` bash
+[TODO]状态机实现模式切换
+```
+``` bash
+[TODO]nav2_params导航参数调节
+```
 ``` bash
 turtle3init
 ```
 ``` bash
 # default
-ros2 launch nav2_bringup navigation_launch.py \
+ros2 launch nav2_bringup bringup_launch.py \
   use_sim_time:=True \
-  params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params.yaml # 或你自己的param路径
+  autostart:=False \
+  map:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/map/map_00829.yaml \
+  params_file:=/home/{$USER_NAME}/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params.yam  # 或你自己的param路径
 ```
+
 ``` bash
-# jiangn19
-ros2 launch nav2_bringup navigation_launch.py \
+# sudongxu
+ros2 launch nav2_bringup bringup_launch_without_smooth.py \
   use_sim_time:=True \
-  params_file:=/home/nanyuanchaliang/Documents/vln_gazebo_simulator/nav2_params.yaml
+  autostart:=False \
+  map:=/home/sudongxu/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/map/map1216.yaml \
+  params_file:=/home/sudongxu/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params_pnc_dwb2.yaml  # 不包含平滑节点，以符合机器人底盘的要求
 ```
+
 ``` bash
 # chengsn
 ros2 launch nav2_bringup navigation_launch.py \
   use_sim_time:=True \
+  autostart:=False \
+  map:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/maps/site_00829.yaml \
   params_file:=/home/chengsn/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params.yaml
+```
+
+``` bash
+LaunchArgument参数解释
+- slam：Whether run a SLAM，默认为False
+   设置slam=True， 引入 slam_launch.py（map_saver + slam_toolbox 等）
+   否则，设置slam=False， 引入 localization_launch.py（map_server + amcl）
+   无论上述选择如何，都引入 navigation_launch.py（规划/控制/BT等）
+- autostart：Automatically startup the nav2 stack，默认为True
+- map：Full path to map yaml file to load
+```
+
+``` bash
+而后通过以下指令开启rviz，上面已将autostart设置为False，需要在rviz中设置2D Pose Estimate 与 Nav2 Goal 。
+```
+[TODO]否则，需要手动发送2D Pose Estimate， 利用状态机自动发送。
+``` bash
+ros2 launch nav2_bringup rviz_launch.py
+```
+
+
+### [导航阶段]仅启动导航节点
+``` bash
+ros2 launch nav2_bringup navigation_launch_without_smooth.py \
+  use_sim_time:=True \
+  params_file:=/home/sudongxu/Documents/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/config/nav2/nav2_params_pnc_dwb2.yaml  # 不包含平滑节点，以符合机器人底盘的要求
 ```
 
 ### [导航阶段]启动语义障碍投影节点
