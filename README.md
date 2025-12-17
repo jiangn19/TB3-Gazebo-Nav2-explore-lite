@@ -143,13 +143,14 @@ turtle3init
 ros2 run nav2_map_server map_saver_cli -f ~/Workspace/VLN_ws/vln_gazebo_simulator/src/TB3-Gazebo-Nav2-explore-lite/map/map_00829
 ```
 
-### [导航阶段]启动nav2导航
+### 导航阶段
 ``` bash
 [TODO]状态机实现模式切换
 ```
 ``` bash
 [TODO]nav2_params导航参数调节
 ```
+### [定位+导航阶段]启动nav2定位+导航
 ``` bash
 turtle3init
 ```
@@ -190,6 +191,10 @@ LaunchArgument参数解释
 - map：Full path to map yaml file to load
 ```
 
+### [可视化]rviz可视化
+``` bash
+turtle3init
+```
 ``` bash
 而后通过以下指令开启rviz，上面已将autostart设置为False，需要在rviz中设置2D Pose Estimate 与 Nav2 Goal 。
 ```
