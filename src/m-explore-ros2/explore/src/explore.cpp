@@ -37,6 +37,8 @@
  *********************************************************************/
 
 #include <explore/explore.h>
+#include "nav2_costmap_2d/cost_values.hpp"
+#include "nav2_costmap_2d/costmap_2d.hpp"
 
 #include <thread>
 
@@ -48,6 +50,52 @@ inline static bool same_point(const geometry_msgs::msg::Point& one,
   double dist = sqrt(dx * dx + dy * dy);
   return dist < 0.01;
 }
+
+inline static bool snap_to_nearest_free(nav2_costmap_2d::Costmap2D* cm,
+                                       const geometry_msgs::msg::Point& in,
+                                       geometry_msgs::msg::Point& out,
+                                       int max_radius_cells)
+{
+  if (!cm) {
+    return false;
+  }
+
+  unsigned int mx, my;
+  if (!cm->worldToMap(in.x, in.y, mx, my)) {
+    return false;
+  }
+
+  const int w = static_cast<int>(cm->getSizeInCellsX());
+  const int h = static_cast<int>(cm->getSizeInCellsY());
+
+  auto inBounds = [&](int x, int y) { return x >= 0 && y >= 0 && x < w && y < h; };
+
+  // square "growing ring" search; return the first FREE cell found
+  for (int r = 0; r <= max_radius_cells; ++r) {
+    for (int dy = -r; dy <= r; ++dy) {
+      for (int dx = -r; dx <= r; ++dx) {
+        int x = static_cast<int>(mx) + dx;
+        int y = static_cast<int>(my) + dy;
+        if (!inBounds(x, y)) {
+          continue;
+        }
+        unsigned char c = cm->getCost(static_cast<unsigned int>(x),
+                                      static_cast<unsigned int>(y));
+        if (c == nav2_costmap_2d::FREE_SPACE) {
+          double wx, wy;
+          cm->mapToWorld(static_cast<unsigned int>(x),
+                         static_cast<unsigned int>(y), wx, wy);
+          out = in;
+          out.x = wx;
+          out.y = wy;
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 
 namespace explore
 {
@@ -71,6 +119,12 @@ Explore::Explore()
   this->declare_parameter<float>("min_frontier_size", 0.5);
   this->declare_parameter<bool>("return_to_init", false);
 
+
+  // extra tuning knobs
+  this->declare_parameter<int>("tiny_frontier_cells", 3);
+  this->declare_parameter<int>("tiny_frontier_patience", 5);
+  this->declare_parameter<int>("snap_search_radius_cells", 10);
+
   this->get_parameter("planner_frequency", planner_frequency_);
   this->get_parameter("progress_timeout", timeout);
   this->get_parameter("visualize", visualize_);
@@ -80,6 +134,11 @@ Explore::Explore()
   this->get_parameter("min_frontier_size", min_frontier_size);
   this->get_parameter("return_to_init", return_to_init_);
   this->get_parameter("robot_base_frame", robot_base_frame_);
+
+
+  this->get_parameter("tiny_frontier_cells", tiny_frontier_cells_);
+  this->get_parameter("tiny_frontier_patience", tiny_frontier_patience_);
+  this->get_parameter("snap_search_radius_cells", snap_search_radius_cells_);
 
   progress_timeout_ = timeout;
   move_base_client_ =
@@ -239,14 +298,24 @@ void Explore::visualizeFrontiers(
 
 void Explore::makePlan()
 {
-  // find frontiers
-  auto pose = costmap_client_.getRobotPose();
-  // get frontiers sorted according to cost
-  auto frontiers = search_.searchFrom(pose.position);
-  RCLCPP_DEBUG(logger_, "found %lu frontiers", frontiers.size());
-  for (size_t i = 0; i < frontiers.size(); ++i) {
-    RCLCPP_DEBUG(logger_, "frontier %zd cost: %f", i, frontiers[i].cost);
+  // 有 active goal 就不要重选 frontier
+  // --- NEW: if navigating to an active goal, only do timeout checking ---
+  if (has_active_goal_ && !resuming_) {
+    if ((this->now() - last_progress_) > tf2::durationFromSec(progress_timeout_)) {
+      frontier_blacklist_.push_back(active_goal_key_);
+      RCLCPP_WARN(logger_,
+                  "No progress for %.1fs (by nav2 feedback), blacklist active goal and retry later.",
+                  progress_timeout_);
+
+      move_base_client_->async_cancel_all_goals();
+      has_active_goal_ = false;
+    }
+    return;  // don't replan while a goal is active
   }
+
+  // 1) get current pose and frontiers
+  auto pose = costmap_client_.getRobotPose();
+  auto frontiers = search_.searchFrom(pose.position);
 
   if (frontiers.empty()) {
     RCLCPP_WARN(logger_, "No frontiers found, stopping.");
@@ -259,68 +328,173 @@ void Explore::makePlan()
     visualizeFrontiers(frontiers);
   }
 
-  // find non blacklisted frontier
-  auto frontier =
-      std::find_if_not(frontiers.begin(), frontiers.end(),
-                       [this](const frontier_exploration::Frontier& f) {
-                         return goalOnBlacklist(f.centroid);
-                       });
-  if (frontier == frontiers.end()) {
-    RCLCPP_WARN(logger_, "All frontiers traversed/tried out, stopping.");
-    stop(true);
+  // 2) choose a frontier:
+  //    - not blacklisted (by centroid)
+  //    - not "tiny" (frontier.size is number of cells)
+  auto it = frontiers.end();
+  bool has_non_blacklisted = false;
+  bool has_only_tiny = false;
+
+  for (auto f_it = frontiers.begin(); f_it != frontiers.end(); ++f_it) {
+    if (goalOnBlacklist(f_it->centroid)) {
+      continue;
+    }
+    has_non_blacklisted = true;
+
+    if (static_cast<int>(f_it->size) < tiny_frontier_cells_) {
+      has_only_tiny = true;
+      continue;
+    }
+
+    it = f_it;
+    break;
+  }
+
+  if (it == frontiers.end()) {
+    if (!has_non_blacklisted) {
+      RCLCPP_WARN(logger_, "All frontiers traversed/tried out, stopping.");
+      stop(true);
+      return;
+    }
+
+    // Only tiny frontiers remain: allow a few cycles in case mapping/TF changes
+    tiny_frontier_counter_++;
+    RCLCPP_WARN(logger_,
+                "Only tiny frontiers remain (size < %d cells). "
+                "patience=%d/%d",
+                tiny_frontier_cells_, tiny_frontier_counter_, tiny_frontier_patience_);
+
+    if (tiny_frontier_counter_ >= tiny_frontier_patience_) {
+      RCLCPP_WARN(logger_, "Tiny frontiers persist, stopping exploration.");
+      stop(true);
+    }
     return;
   }
-  geometry_msgs::msg::Point target_position = frontier->centroid;
 
-  // time out if we are not making any progress
-  bool same_goal = same_point(prev_goal_, target_position);
+  // got a valid frontier
+  tiny_frontier_counter_ = 0;
+  const auto& frontier = *it;
 
-  prev_goal_ = target_position;
-  if (!same_goal || prev_distance_ > frontier->min_distance) {
-    // we have different goal or we made some progress
-    last_progress_ = this->now();
-    prev_distance_ = frontier->min_distance;
-  }
-  // black list if we've made no progress for a long time
-  if ((this->now() - last_progress_ >
-      tf2::durationFromSec(progress_timeout_)) && !resuming_) {
-    frontier_blacklist_.push_back(target_position);
-    RCLCPP_DEBUG(logger_, "Adding current goal to black list");
-    makePlan();
-    return;
+  // 3) create a "goal key" for progress + blacklist (centroid), and a real target for nav2 (snapped)
+  geometry_msgs::msg::Point goal_key = frontier.centroid;   // stable identity
+  geometry_msgs::msg::Point target_position = frontier.centroid;
+
+  nav2_costmap_2d::Costmap2D* cm = costmap_client_.getCostmap();
+  geometry_msgs::msg::Point snapped;
+
+  if (snap_to_nearest_free(cm, frontier.centroid, snapped, snap_search_radius_cells_)) {
+    target_position = snapped;
+  } else if (snap_to_nearest_free(cm, frontier.middle, snapped, snap_search_radius_cells_)) {
+    target_position = snapped;
   }
 
-  // ensure only first call of makePlan was set resuming to true
+  // 4) progress / timeout logic uses the goal_key (NOT snapped), otherwise the blacklist never matches
+  bool same_goal = same_point(prev_goal_key_, goal_key);
+  prev_goal_key_ = goal_key;
+
+  // 删掉了用 frontier.min_distance 的 progress 判定
+  // if (!same_goal || prev_distance_ > frontier.min_distance) {
+  //   last_progress_ = this->now();
+  //   prev_distance_ = frontier.min_distance;
+  // }
+
+  // if ((this->now() - last_progress_ > tf2::durationFromSec(progress_timeout_)) && !resuming_) {
+  //   frontier_blacklist_.push_back(goal_key);
+  //   RCLCPP_WARN(logger_, "No progress for %.1fs, blacklist this frontier and retry later.",
+  //               progress_timeout_);
+  //   // DO NOT recurse into makePlan(): let the timer call again to avoid stack growth.
+  //   return;
+  // }
+
   if (resuming_) {
     resuming_ = false;
   }
 
-  // we don't need to do anything if we still pursuing the same goal
+  // still pursuing the same goal (key) -> do nothing
   if (same_goal) {
     return;
   }
 
-  RCLCPP_DEBUG(logger_, "Sending goal to move base nav2");
+  // 5) send goal to nav2
+  // RCLCPP_DEBUG(logger_, "Sending goal to move base nav2 (target=%.3f,%.3f key=%.3f,%.3f size=%u dist=%.3f)",
+  //              target_position.x, target_position.y, goal_key.x, goal_key.y,
+  //              frontier.size, frontier.min_distance);
 
-  // send goal to move_base if we have something new to pursue
+  // auto goal = nav2_msgs::action::NavigateToPose::Goal();
+  // goal.pose.pose.position = target_position;
+  // goal.pose.pose.orientation.w = 1.0;
+  // goal.pose.header.frame_id = costmap_client_.getGlobalFrameID();
+  // goal.pose.header.stamp = this->now();
+
+  // auto send_goal_options =
+  //     rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SendGoalOptions();
+
+  // // pass goal_key (centroid) for blacklisting on aborted
+  // send_goal_options.result_callback =
+  //     [this, goal_key](const NavigationGoalHandle::WrappedResult& result) {
+  //       reachedGoal(result, goal_key);
+  //     };
+
+  // move_base_client_->async_send_goal(goal, send_goal_options);
+
+  // 5) send goal to nav2
+  RCLCPP_DEBUG(logger_,
+               "Sending goal to nav2 (target=%.3f,%.3f key=%.3f,%.3f size=%u)",
+               target_position.x, target_position.y,
+               goal_key.x, goal_key.y, frontier.size);
+
   auto goal = nav2_msgs::action::NavigateToPose::Goal();
   goal.pose.pose.position = target_position;
-  goal.pose.pose.orientation.w = 1.;
+  goal.pose.pose.orientation.w = 1.0;
   goal.pose.header.frame_id = costmap_client_.getGlobalFrameID();
   goal.pose.header.stamp = this->now();
 
+  // --- NEW: lock active goal + progress based on nav2 feedback ---
+  active_goal_key_ = goal_key;
+  active_target_position_ = target_position;
+  has_active_goal_ = true;
+  last_feedback_distance_remaining_ = std::numeric_limits<double>::infinity();
+  last_progress_ = this->now();  // reset progress timer on new goal
+
   auto send_goal_options =
-      rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SendGoalOptions();
-  // send_goal_options.goal_response_callback =
-  // std::bind(&Explore::goal_response_callback, this, _1);
-  // send_goal_options.feedback_callback =
-  //   std::bind(&Explore::feedback_callback, this, _1, _2);
+    rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SendGoalOptions();
+
+  send_goal_options.goal_response_callback =
+    [this](std::shared_ptr<NavigationGoalHandle> handle) {
+      if (!handle) {
+        RCLCPP_WARN(logger_, "NavigateToPose goal was rejected by server");
+        has_active_goal_ = false;
+      } else {
+        RCLCPP_DEBUG(logger_, "NavigateToPose goal accepted");
+      }
+    };
+
+  send_goal_options.feedback_callback =
+    [this](NavigationGoalHandle::SharedPtr,
+           const std::shared_ptr<const nav2_msgs::action::NavigateToPose::Feedback> feedback) {
+      if (!feedback) { return; }
+
+      const double d = feedback->distance_remaining;
+      if (!std::isfinite(d)) { return; }
+
+      // “有进展”的判据：剩余距离下降了一点点（防抖）
+      constexpr double EPS = 0.05;  // 5cm
+      if (d + EPS < last_feedback_distance_remaining_) {
+        last_feedback_distance_remaining_ = d;
+        last_progress_ = this->now();
+        RCLCPP_DEBUG(logger_, "progress: distance_remaining=%.3f", d);
+      }
+    };
+
+  // pass goal_key (centroid) for blacklisting on aborted
   send_goal_options.result_callback =
-      [this,
-       target_position](const NavigationGoalHandle::WrappedResult& result) {
-        reachedGoal(result, target_position);
-      };
+    [this, goal_key](const NavigationGoalHandle::WrappedResult& result) {
+      reachedGoal(result, goal_key);
+    };
+
   move_base_client_->async_send_goal(goal, send_goal_options);
+
+
 }
 
 void Explore::returnToInitialPose()
@@ -357,6 +531,7 @@ bool Explore::goalOnBlacklist(const geometry_msgs::msg::Point& goal)
 void Explore::reachedGoal(const NavigationGoalHandle::WrappedResult& result,
                           const geometry_msgs::msg::Point& frontier_goal)
 {
+  has_active_goal_ = false;  // NEW: goal finished (any result)
   switch (result.code) {
     case rclcpp_action::ResultCode::SUCCEEDED:
       RCLCPP_DEBUG(logger_, "Goal was successful");
