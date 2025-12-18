@@ -45,6 +45,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <geometry_msgs/msg/point.hpp>
 #include <memory>
 #include <mutex>
@@ -125,6 +126,25 @@ private:
 
   std::vector<geometry_msgs::msg::Point> frontier_blacklist_;
   geometry_msgs::msg::Point prev_goal_;
+
+  // --- stopping / filtering heuristics ---
+  int tiny_frontier_cells_;          // if frontier.size < this -> treat as tiny
+  int tiny_frontier_patience_;       // consecutive planning cycles with only tiny frontiers before stopping
+  int tiny_frontier_counter_ = 0;    // internal counter
+
+  // --- active goal tracking (to prevent goal drifting / frequent replans) ---
+  bool has_active_goal_{false};
+  geometry_msgs::msg::Point active_goal_key_;         // stable identity key (centroid)
+  geometry_msgs::msg::Point active_target_position_;  // snapped target we actually send to nav2
+
+  // --- nav2 feedback-based progress (more reliable than frontier.min_distance) ---
+  double last_feedback_distance_remaining_{std::numeric_limits<double>::infinity()};
+
+
+  // --- goal snapping ---
+  int snap_search_radius_cells_;     // radius (in cells) to search a FREE cell near centroid/middle
+
+  geometry_msgs::msg::Point prev_goal_key_;  // compare / blacklist using frontier key (centroid), not snapped goal
   double prev_distance_;
   rclcpp::Time last_progress_;
   size_t last_markers_count_;
@@ -140,6 +160,7 @@ private:
   bool return_to_init_;
   std::string robot_base_frame_;
   bool resuming_ = false;
+
 };
 }  // namespace explore
 
